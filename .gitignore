@@ -1,13 +1,14 @@
+# .gitignore - Files and directories Git should ignore
+
 # Virtual environment directory
 venv/
 
-# Python bytecode files
+# Python bytecode and caches
 *.pyc
 __pycache__/
 
-# Environment variables file (keep secrets out of Git)
+# Local environment variable file (do not commit secrets)
 .env
 
-# VS Code settings (if you don't want to share personal settings)
+# VS Code workspace settings
 .vscode/
-

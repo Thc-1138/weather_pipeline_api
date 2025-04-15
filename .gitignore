@@ -1,0 +1,13 @@
+# Virtual environment directory
+venv/
+
+# Python bytecode files
+*.pyc
+__pycache__/
+
+# Environment variables file (keep secrets out of Git)
+.env
+
+# VS Code settings (if you don't want to share personal settings)
+.vscode/
+

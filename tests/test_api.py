@@ -25,6 +25,7 @@ class TestAPI(unittest.TestCase):
         })
         self.assertEqual(response.status_code, 200)
         data = response.json()
+        # Verify keys in the response
         self.assertIn("status", data)
         self.assertIn("rows_loaded", data)
 

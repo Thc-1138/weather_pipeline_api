@@ -1,12 +1,14 @@
 """
 pipeline.py - ETL Pipeline for Weather Data
 
-This module defines the functions for the Extract-Transform-Load (ETL)
-process:
-  1. extract_weather_data: Retrieves weather data from Open-Meteo API.
-  2. transform: Maps the API's response to a list of dictionaries that match the DB schema.
-  3. load: Inserts the transformed data into the PostgreSQL table.
-  4. run_pipeline: Orchestrates the ETL steps and returns the row count inserted.
+This module implements the full ETL process:
+  1. Extraction: Retrieve historical weather data from the Open-Meteo API.
+  2. Transformation: Convert the raw API data into a structured list of records.
+  3. Loading: Insert the structured records into the PostgreSQL database.
+  4. Orchestration: run_pipeline() ties these steps together.
+
+Each record's keys are named to directly match the API's parameter names,
+so our transformed data fields match what Open-Meteo returns.
 """
 
 import requests
@@ -14,132 +16,145 @@ from app.db import get_db_connection
 
 def extract_weather_data(lat, lon, start_date, end_date):
     """
-    Extract weather data using the Open-Meteo historical API.
-    
-    Parameters:
-        lat (float): Latitude for the location.
-        lon (float): Longitude for the location.
-        start_date (str): Date in 'YYYY-MM-DD' format for start.
-        end_date (str): Date in 'YYYY-MM-DD' format for end.
-        
+    Extracts weather data from the Open-Meteo historical API.
+
+    Args:
+        lat (float): Latitude coordinate for the target location.
+        lon (float): Longitude coordinate for the target location.
+        start_date (str): Start date in 'YYYY-MM-DD' format.
+        end_date (str): End date in 'YYYY-MM-DD' format.
+
     Returns:
-        dict: JSON response from the API containing weather data.
+        dict: The JSON response from the API.
+
+    Note:
+        The URL requests 15 specific hourly parameters to capture detailed weather data.
     """
     url = (
         f"https://archive-api.open-meteo.com/v1/archive?latitude={lat}"
         f"&longitude={lon}&start_date={start_date}&end_date={end_date}"
-        # Requesting 16 hourly parameters including the new fields
-        "&hourly=temperature_2m,precipitation,snowfall,cloudcover,windspeed_10m,"
+        # Requesting fields that will be used by the pipeline.
+        "&hourly=temperature_2m,precipitation,snowfall,cloud_cover,wind_speed_10m,"
         "relative_humidity_2m,apparent_temperature,precipitation_probability,"
-        "windgusts_10m,pressure_msl,wind_direction,weathercode,rain,surface_pressure"
+        "wind_gusts_10m,pressure_msl,wind_direction_10m,weather_code,rain,surface_pressure"
         "&timezone=UTC"
     )
     response = requests.get(url)
-    response.raise_for_status()  # Raises an error for unsuccessful API calls.
+    response.raise_for_status()  # Throws HTTPError if the API request fails.
     return response.json()
 
 def transform(data):
     """
-    Transform the raw API response into a structured list of records.
+    Transforms raw API data into a list of structured records.
     
-    This function assumes the API returns an 'hourly' dictionary with lists for each field.
-    Each record corresponds to a specific timestamp.
+    Expects 'hourly' data structured as a dictionary of lists (one list per field).
+    Each record corresponds to a specific time, aligning indices across all fields.
     
-    Parameters:
-        data (dict): The JSON data from the API.
-        
+    Args:
+        data (dict): Raw JSON data returned by the API.
+    
     Returns:
-        list: A list of dictionaries, each containing one row of weather data.
+        list: A list of dictionaries. Each dictionary represents a weather record with keys that match the API names.
+    
+    Important:
+        The output keys (e.g., 'temperature_2m', 'wind_direction_10m', 'weather_code', etc.)
+        match the parameter names from the API for consistency.
     """
     hourly = data.get("hourly", {})
     timestamps = hourly.get("time", [])
-    rows = []
+    records = []
+    # Loop over each timestamp index to construct individual records.
     for i, ts in enumerate(timestamps):
-        row = {
+        record = {
             "timestamp": ts,
-            "temperature": hourly.get("temperature_2m", [None])[i],
+            "temperature_2m": hourly.get("temperature_2m", [None])[i],
             "precipitation": hourly.get("precipitation", [None])[i],
             "snowfall": hourly.get("snowfall", [None])[i],
-            "cloudcover": hourly.get("cloudcover", [None])[i],
-            "windspeed": hourly.get("windspeed_10m", [None])[i],
-            "relative_humidity": hourly.get("relative_humidity_2m", [None])[i],
+            "cloud_cover": hourly.get("cloud_cover", [None])[i],
+            "wind_speed_10m": hourly.get("wind_speed_10m", [None])[i],
+            "relative_humidity_2m": hourly.get("relative_humidity_2m", [None])[i],
             "apparent_temperature": hourly.get("apparent_temperature", [None])[i],
             "precipitation_probability": hourly.get("precipitation_probability", [None])[i],
-            "windgusts": hourly.get("windgusts_10m", [None])[i],
+            "wind_gusts_10m": hourly.get("wind_gusts_10m", [None])[i],
             "pressure_msl": hourly.get("pressure_msl", [None])[i],
-            "wind_direction": hourly.get("wind_direction", [None])[i],
-            "weathercode": hourly.get("weathercode", [None])[i],
+            "wind_direction_10m": hourly.get("wind_direction_10m", [None])[i],
+            "weather_code": hourly.get("weather_code", [None])[i],
             "rain": hourly.get("rain", [None])[i],
             "surface_pressure": hourly.get("surface_pressure", [None])[i]
         }
-        rows.append(row)
-    return rows
+        records.append(record)
+    return records
 
-def load(rows, venue_id):
+def load(records, venue_id):
     """
-    Load the transformed weather records into the PostgreSQL database.
+    Loads the list of weather records into the PostgreSQL database.
+
+    For each record in the provided list, this function executes an INSERT statement.
     
-    Parameters:
-        rows (list): The list of records to load.
-        venue_id (str): An identifier for the venue.
-        
+    Args:
+        records (list): List of dictionaries representing weather records.
+        venue_id (str): Identifier for the venue (e.g., a location code).
+    
     Returns:
-        int: The number of rows successfully inserted.
+        int: The number of rows inserted into the database.
+    
+    Note:
+        The INSERT query columns must match the keys produced by the transform() function.
     """
-    conn = get_db_connection()
+    conn = get_db_connection()  # Create a new database connection.
     cur = conn.cursor()
     insert_query = """
         INSERT INTO weather_data (
-            venue_id, timestamp, temperature, precipitation, snowfall, 
-            cloudcover, windspeed, relative_humidity, apparent_temperature, 
-            precipitation_probability, windgusts, pressure_msl, wind_direction, 
-            weathercode, rain, surface_pressure
+            venue_id, timestamp, temperature_2m, precipitation, snowfall, 
+            cloud_cover, wind_speed_10m, relative_humidity_2m, apparent_temperature, 
+            precipitation_probability, wind_gusts_10m, pressure_msl, wind_direction_10m, 
+            weather_code, rain, surface_pressure
         )
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """
-    for row in rows:
+    for rec in records:
         cur.execute(insert_query, (
             venue_id,
-            row["timestamp"],
-            row["temperature"],
-            row["precipitation"],
-            row["snowfall"],
-            row["cloudcover"],
-            row["windspeed"],
-            row["relative_humidity"],
-            row["apparent_temperature"],
-            row["precipitation_probability"],
-            row["windgusts"],
-            row["pressure_msl"],
-            row["wind_direction"],
-            row["weathercode"],
-            row["rain"],
-            row["surface_pressure"]
+            rec["timestamp"],
+            rec["temperature_2m"],
+            rec["precipitation"],
+            rec["snowfall"],
+            rec["cloud_cover"],
+            rec["wind_speed_10m"],
+            rec["relative_humidity_2m"],
+            rec["apparent_temperature"],
+            rec["precipitation_probability"],
+            rec["wind_gusts_10m"],
+            rec["pressure_msl"],
+            rec["wind_direction_10m"],
+            rec["weather_code"],
+            rec["rain"],
+            rec["surface_pressure"]
         ))
     conn.commit()
-    inserted_count = len(rows)
+    count = len(records)
     cur.close()
     conn.close()
-    return inserted_count
+    return count
 
 def run_pipeline(venue_id, start_date, end_date):
     """
-    Run the full ETL pipeline: extract weather data, transform it, and load into the database.
-    
-    For demonstration, fixed coordinates (e.g., New York City) are used.
-    In production, map the venue_id to geographic coordinates.
-    
-    Parameters:
+    Orchestrates the full ETL process.
+
+    It extracts weather data (using hardcoded coordinates for demonstration),
+    transforms the raw data into structured records, and loads them into the database.
+
+    Args:
         venue_id (str): Identifier for the venue.
         start_date (str): Start date in 'YYYY-MM-DD' format.
         end_date (str): End date in 'YYYY-MM-DD' format.
-        
+    
     Returns:
-        int: The number of rows inserted into the database.
+        int: The total number of rows inserted into the database.
     """
-    # Example coordinates for New York City
+    # Fixed coordinates are used here (representing, e.g., New York City).
     lat, lon = 40.71, -74.01  
     data = extract_weather_data(lat, lon, start_date, end_date)
-    rows = transform(data)
-    count = load(rows, venue_id)
-    return count
+    records = transform(data)
+    inserted_count = load(records, venue_id)
+    return inserted_count

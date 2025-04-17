@@ -1,3 +1,6 @@
+![CI/CD](https://github.com/Thc-1138/weather_pipeline_api/actions/workflows/ci-cd.yml/badge.svg)
+
+
 # Weather Pipeline API
 
 This project is a Python-based ETL pipeline and API that fetches historical weather data, transforms it, and loads it into a PostgreSQL database hosted on Azure.

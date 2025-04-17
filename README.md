@@ -46,7 +46,7 @@ weather_pipeline_api/
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/weather_pipeline_api.git
+git clone https://github.com/Thc-1138/weather_pipeline_api.git
 cd weather_pipeline_api
 ```
 
@@ -86,7 +86,7 @@ DB_HOST=weather-db-thc.postgres.database.azure.com
 DB_PORT=5432
 DB_NAME=weather
 DB_USER=weather_admin
-DB_PASSWORD=yourStrongPassword123!
+DB_PASSWORD=Zr9!vB73xQm#LpN2
 DB_SSLMODE=require
 ```
 
@@ -117,7 +117,7 @@ python -m unittest discover tests
 - **Docker:** The provided `Dockerfile` can be used to containerize the application.  
 - **CI/CD Pipelines:**
   - `azure-pipelines.yml` for Azure DevOps  
-  - `.github/workflows/deploy.yml` for GitHub Actions
+  - `.github/workflows/ci-cd.yml` for GitHub Actions
 
 These pipelines automate testing and deployment when changes are pushed to the `master` branch.
 

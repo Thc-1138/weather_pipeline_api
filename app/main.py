@@ -6,9 +6,15 @@ triggers the ETL pipeline. The pipeline runner is provided via a FastAPI
 dependency (get_pipeline_runner), making it easy to override in tests.
 """
 
+import logging
 from fastapi import FastAPI, HTTPException, Depends
 from datetime import date
 from app.pipeline import run_pipeline as default_run_pipeline
+
+
+# Configure root logger to output INFO+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Weather Pipeline API", version="1.0.0")
 
@@ -40,9 +46,12 @@ def get_weather(
         JSON response with 'status' and 'rows_loaded'.
         Raises HTTPException(500) on errors.
     """
+    logger.info(f"GET /weather?venue_id={venue_id}&start_date={start_date}&end_date={end_date}")
     try:
         rows_loaded = run_pipeline(venue_id, start_date, end_date)
+        logger.info(f"Rows loaded: {rows_loaded}")
         return {"status": "success", "rows_loaded": rows_loaded}
     except Exception as e:
+        logger.error(f"Pipeline error: {e}", exc_info=True)
         # Propagate exceptions as HTTP 500 for visibility
         raise HTTPException(status_code=500, detail=str(e))

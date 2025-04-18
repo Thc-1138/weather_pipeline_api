@@ -6,8 +6,10 @@ import os
 import psycopg2
 import pytest
 
-@pytest.mark.usefixtures("postgres_container")
-def test_qa_checks():
+from pytest import mark
+
+@mark.usefixtures("postgres_container")
+def test_qa_checks(postgres_container):
     """
     Execute each QA check in sql/qa_checks.sql; fail if any check returns rows.
     """

@@ -26,6 +26,12 @@ jobs:
       - name: Run unit & integration tests
         run: python -m unittest discover tests
 
+      - name: Run unit & API tests
+        run: pytest tests/test_pipeline.py tests/test_api.py -q
+
+      - name: Run integration tests
+        run: pytest tests/test_integration.py -q        
+
   deploy:
     needs: build-and-test
     runs-on: ubuntu-latest

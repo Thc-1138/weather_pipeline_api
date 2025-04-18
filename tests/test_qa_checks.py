@@ -12,12 +12,12 @@ def test_qa_checks():
     Execute each QA check in sql/qa_checks.sql; fail if any check returns rows.
     """
 dsn = dict(
-host=os.environ["DB_HOST"],
-port=os.environ["DB_PORT"],
-dbname=os.environ["DB_NAME"],
-user=os.environ["DB_USER"],
-password=os.environ["DB_PASSWORD"],
-sslmode=os.environ.get("DB_SSLMODE", "disable")
+    host=os.environ["DB_HOST"],
+    port=os.environ["DB_PORT"],
+    dbname=os.environ["DB_NAME"],
+    user=os.environ["DB_USER"],
+    password=os.environ["DB_PASSWORD"],
+    sslmode=os.environ.get("DB_SSLMODE", "disable")
 )
 conn = psycopg2.connect(**dsn)
 cur = conn.cursor()

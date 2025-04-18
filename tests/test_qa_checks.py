@@ -1,42 +1,34 @@
-"""
-Integration test to run QA checks SQL queries against the test database.
-Any non-empty result indicates a data inconsistency.
-"""
 import os
 import psycopg2
 import pytest
 
-from pytest import mark
-
-@mark.usefixtures("postgres_container")
-def test_qa_checks(postgres_container):
+@pytest.mark.usefixtures("postgres_container")
+def test_qa_checks():
     """
-    Execute each QA check in sql/qa_checks.sql; fail if any check returns rows.
+    Runs each QA SQL in sql/qa_checks.sql; fails if any check returns rows.
     """
-# Read DB connection settings now that the postgres_container fixture has run
-dsn = {
-    'host': os.environ.get('DB_HOST'),
-    'port': os.environ.get('DB_PORT'),
-    'dbname': os.environ.get('DB_NAME'),
-    'user': os.environ.get('DB_USER'),
-    'password': os.environ.get('DB_PASSWORD'),
-    'sslmode': os.environ.get('DB_SSLMODE', 'disable'),
-}
-# Ensure environment variables are present
-missing = [k for k, v in dsn.items() if v is None]
-assert not missing, f"Missing environment variables for DB connection: {missing}"
+    # Build connection parameters from env vars
+    dsn = {
+        "host":     os.environ["DB_HOST"],
+        "port":     os.environ["DB_PORT"],
+        "dbname":   os.environ["DB_NAME"],
+        "user":     os.environ["DB_USER"],
+        "password": os.environ["DB_PASSWORD"],
+        "sslmode":  os.environ.get("DB_SSLMODE", "disable"),
+    }
 
-conn = psycopg2.connect(**dsn)
-cur = conn.cursor()
+    # Connect and run each query in qa_checks.sql
+    conn = psycopg2.connect(**dsn)
+    cur = conn.cursor()
 
-# Load and split queries
-sql = open("sql/qa_checks.sql").read().strip()
-queries = [q.strip() for q in sql.split(";\n") if q.strip()]
+    # Split on semicolon + newline to get individual statements
+    raw_sql = open("sql/qa_checks.sql").read().strip()
+    queries = [q.strip() for q in raw_sql.split(";\n") if q.strip()]
 
-for query in queries:
-    cur.execute(query)
-    rows = cur.fetchall()
-    assert not rows, f"QA check failed for query:\n{query}\nViolations: {rows}"
+    for query in queries:
+        cur.execute(query)
+        rows = cur.fetchall()
+        assert not rows, f"QA check failed for:\n{query}\nReturned rows:\n{rows}"
 
-cur.close()
-conn.close()
+    cur.close()
+    conn.close()

@@ -11,14 +11,19 @@ def test_qa_checks():
     """
     Execute each QA check in sql/qa_checks.sql; fail if any check returns rows.
     """
-dsn = dict(
-    host=os.environ["DB_HOST"],
-    port=os.environ["DB_PORT"],
-    dbname=os.environ["DB_NAME"],
-    user=os.environ["DB_USER"],
-    password=os.environ["DB_PASSWORD"],
-    sslmode=os.environ.get("DB_SSLMODE", "disable")
-)
+# Read DB connection settings now that the postgres_container fixture has run
+dsn = {
+    'host': os.environ.get('DB_HOST'),
+    'port': os.environ.get('DB_PORT'),
+    'dbname': os.environ.get('DB_NAME'),
+    'user': os.environ.get('DB_USER'),
+    'password': os.environ.get('DB_PASSWORD'),
+    'sslmode': os.environ.get('DB_SSLMODE', 'disable'),
+}
+# Ensure environment variables are present
+missing = [k for k, v in dsn.items() if v is None]
+assert not missing, f"Missing environment variables for DB connection: {missing}"
+
 conn = psycopg2.connect(**dsn)
 cur = conn.cursor()
 
